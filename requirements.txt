@@ -1,0 +1,10 @@
+langchain
+langchain-openai
+langchain-core
+langchain-community
+langgraph
+openai
+python-dotenv
+mysql-connector-python
+fastapi
+uvicorn
