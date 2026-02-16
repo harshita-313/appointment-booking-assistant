@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Appointment Booking</title>
+</head>
+
+<body>
+<section class="max-w-7xl mx-auto px-50">
+
+    <div class="hero bg-gredient-dark h-64 flex flex-col px-2">
+        <div class="intro">
+            <h1 class="sticky top-0 text-3xl bg-white font-bold text-center py-5">
+                BOOK YOUR APPOINTMENT TODAY!
+            </h1>   
+        </div>
+
+        <div class="search-box mx-auto my-auto w-full lg:w-3/4">
+
+            <!-- CHAT HISTORY BOX -->
+            <p id="chat_history" class="py-5 mt-5 overflow-y-auto whitespace-pre-wrap"></p>
+
+            <!-- FORM (BUT DISABLED DEFAULT SUBMIT) -->
+            <form id="chat_form" class="flex flex-row mt-10 mb-10">
+                <input
+                    id="user_query"
+                    class="italic rounded bg-gray-100 py-3 w-full px-2 outline-none text-sm text-gray-600"
+                    type="text" placeholder="Type your query..." autocomplete="off"
+                >
+
+                <span class="flex items-center bg-black rounded-tr rounded-br px-3 font-bold">
+                    <button 
+                        type="button"
+                        id="send"
+                        class="hover:bg-gredient-light text-xl text-white bg-black rounded font-bold"
+                    >↑</button>                        
+                </span>
+            </form>
+        </div>
+    </div>
+
+<script>
+/* ------------------------------------------------------
+   SESSION ID
+------------------------------------------------------ */
+let sessionId = localStorage.getItem("session_id");
+
+if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("session_id", sessionId);
+}
+
+/* ------------------------------------------------------
+   LOAD FULL HISTORY ON PAGE LOAD
+------------------------------------------------------ */
+async function loadHistory() {
+    const res = await fetch(`/history/${sessionId}`);
+    const history = await res.json();
+
+    const box = document.getElementById("chat_history");
+
+    box.innerHTML = history
+        .map(m => `${m.role}: ${m.content}`)
+        .join("\n");
+}
+
+window.addEventListener("DOMContentLoaded", loadHistory);
+
+/* ------------------------------------------------------
+   SEND MESSAGE + STREAM RESPONSE
+------------------------------------------------------ */
+async function get_reply() {
+    let user_text = document.getElementById('user_query').value;
+    let historyEl = document.getElementById('chat_history');
+
+    // Show user message immediately
+    historyEl.innerText += `\nuser: ${user_text}\n`;
+
+    const response = await fetch('/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            input: user_text,
+            session_id: sessionId
+        })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    historyEl.innerText += "assistant: ";  // Start assistant message
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+
+        // Append streamed token
+        historyEl.innerText += chunk;
+    }
+
+    document.getElementById('user_query').value = "";
+}
+
+
+/* ------------------------------------------------------
+   BUTTON CLICK
+------------------------------------------------------ */
+document.getElementById("send").addEventListener("click", get_reply);
+
+/* ------------------------------------------------------
+   ENTER KEY: PREVENT PAGE RELOAD
+------------------------------------------------------ */
+document.getElementById("chat_form").addEventListener("submit", function(event) {
+    event.preventDefault();
+});
+
+document.getElementById("user_query").addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        event.preventDefault();   // stop page reload
+        get_reply();
+    }
+});
+</script>
+
+</section>
+</body>
+</html>
